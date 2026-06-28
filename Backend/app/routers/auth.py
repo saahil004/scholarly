@@ -2,10 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserRegister, UserResponse, UserLogin, TokenResponse
+from app.models.otp import OTP
+from app.schemas.user import UserRegister, UserResponse, UserLogin, TokenResponse, VerifyOTP
 import bcrypt
 from app.core.security import create_access_token, verify_token
 from sqlalchemy import or_
+from app.core.otp_utils import generate_otp
+from app.core.email import send_otp_email
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -28,14 +32,56 @@ def register(data : UserRegister, db : Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     
+    # opt generation
+    otpcode = generate_otp()
+    otp = OTP(
+        user_id=new_user.id,
+        code=otpcode,
+        expires_at=datetime.utcnow() + timedelta(minutes=10)
+    )
+    db.add(otp)
+    db.commit()
+    
+    try:
+        send_otp_email(new_user.email, otpcode)
+    except Exception as e:
+        # rollback everything if email fails
+        db.delete(otp)
+        db.delete(new_user)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to send OTP: {str(e)}")
+    
     return new_user
+
+@router.post("/verifyOTP")
+def verifyOTP(data : VerifyOTP, db : Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Email not found.")
+    
+    otp = db.query(OTP).filter(user.id == OTP.user_id, OTP.code == data.otpcode).first()
+    if not otp:
+        raise HTTPException(status_code=400, detail='No OTP found.')
+    if otp.expires_at < datetime.now(timezone.utc):
+        db.delete(otp)
+        db.commit()
+        raise HTTPException(status_code=400, detail="OTP expired. Deleting OTP...")
+
+    user.is_verified = True
+    db.delete(otp)
+    db.commit()   
+    return {"message" : "OTP verified"} 
 
 @router.post("/login", response_model=TokenResponse)
 def login(data : UserLogin, db : Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     
     if not user:
-        raise HTTPException(status_code=404, detail="Email not reigstered.")
+        raise HTTPException(status_code=404, detail="Email not registered.")
+    
+    if user.is_verified == False:
+        raise HTTPException(status_code=400, detail="Email not verified.")
     
     pw = bcrypt.checkpw(data.password.encode("utf-8"), user.password.encode("utf-8"))
     if not pw:

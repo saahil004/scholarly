@@ -31,4 +31,8 @@ class TokenResponse(BaseModel):
     token_type : str = "bearer"
     
     # class Config: we dont need its not an SQLAlchemy object
+    
+class VerifyOTP(BaseModel):
+    email: EmailStr
+    otpcode : str    
               
