@@ -34,5 +34,8 @@ class TokenResponse(BaseModel):
     
 class VerifyOTP(BaseModel):
     email: EmailStr
-    otpcode : str    
+    otpcode : str   
+    
+class ResendOTP(BaseModel):
+    email : EmailStr     
               

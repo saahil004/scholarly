@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.otp import OTP
-from app.schemas.user import UserRegister, UserResponse, UserLogin, TokenResponse, VerifyOTP
+from app.schemas.user import UserRegister, UserResponse, UserLogin, TokenResponse, VerifyOTP, ResendOTP
 import bcrypt
 from app.core.security import create_access_token, verify_token
 from sqlalchemy import or_
@@ -53,7 +53,7 @@ def register(data : UserRegister, db : Session = Depends(get_db)):
     
     return new_user
 
-@router.post("/verifyOTP")
+@router.post("/verifyotp")
 def verifyOTP(data : VerifyOTP, db : Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     
@@ -72,6 +72,37 @@ def verifyOTP(data : VerifyOTP, db : Session = Depends(get_db)):
     db.delete(otp)
     db.commit()   
     return {"message" : "OTP verified"} 
+
+@router.post("/resendotp")
+def resendOTP(data : ResendOTP, db : Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Email not found.")
+    
+    if user.is_verified:
+        raise HTTPException(status_code=400, detail="Email is already verified.")
+    
+    prevotp = db.query(OTP).filter(user.id == OTP.user_id).first()
+    
+    newotp = OTP(
+        code=generate_otp(),
+        user_id=user.id,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
+    )    
+    
+    if prevotp:
+        db.delete(prevotp)
+        db.commit()
+    
+    db.add(newotp)
+    db.commit()
+    try:
+        send_otp_email(user.email, newotp.code)
+        # db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))            
+    
+    return {"message" : "OTP resent."} 
 
 @router.post("/login", response_model=TokenResponse)
 def login(data : UserLogin, db : Session = Depends(get_db)):
