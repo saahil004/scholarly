@@ -21,3 +21,14 @@ class UserResponse(BaseModel):
         
     class Config:
         from_attributes = True    
+     
+class UserLogin(BaseModel):
+    email : EmailStr
+    password : str
+
+class TokenResponse(BaseModel):
+    access_token : str
+    token_type : str = "bearer"
+    
+    # class Config: we dont need its not an SQLAlchemy object
+              

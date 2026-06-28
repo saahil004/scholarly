@@ -11,4 +11,5 @@ class User(Base):
     password = Column(String, nullable=False)
     is_admin = Column(Boolean, default=False)
     phone = Column(String, nullable=False, unique=True)
+    is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
