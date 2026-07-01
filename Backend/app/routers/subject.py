@@ -5,6 +5,8 @@ from app.models.subject import Subject
 from app.schemas.subject import ReturnSubject, MakeSubject, SubjectUpdate
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from app.core.deps import get_admin_user, get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/subject", tags=["subjects"])
 
@@ -14,7 +16,7 @@ def getSubjects(db : Session = Depends(get_db)):
     return all_subjects
 
 @router.post("/create", response_model=ReturnSubject)
-def createSubject(data : MakeSubject, db : Session = Depends(get_db)):
+def createSubject(data : MakeSubject, current_user : User = Depends(get_admin_user), db : Session = Depends(get_db)):
     if data.name == "" or data.name is None:
         raise HTTPException(status_code= 400, detail="Subject needs to have a name.")
     exist = db.query(Subject).filter(func.lower(data.name) == func.lower(Subject.name)).first()
@@ -38,7 +40,7 @@ def createSubject(data : MakeSubject, db : Session = Depends(get_db)):
     return newSub
 
 @router.put("/update/{subject_id}", response_model=ReturnSubject)
-def updateSubject(subject_id : int, data : SubjectUpdate, db : Session = Depends(get_db)):
+def updateSubject(subject_id : int, data : SubjectUpdate, current_user : User = Depends(get_admin_user), db : Session = Depends(get_db)):
     # if data.name is None or data.name == "":
         # raise HTTPException(status_code=400, detail="Name cant be NULL.")
     sub = db.query(Subject).filter(Subject.id == subject_id).first()
@@ -62,7 +64,7 @@ def updateSubject(subject_id : int, data : SubjectUpdate, db : Session = Depends
     return sub        
 
 @router.delete("/delete/{subject_id}")
-def deleteSubject(subject_id : int, db : Session = Depends(get_db)):
+def deleteSubject(subject_id : int, current_user : User = Depends(get_admin_user), db : Session = Depends(get_db)):
     subtodel = db.query(Subject).filter(Subject.id == subject_id).first()
     if not subtodel:
         raise HTTPException(status_code=404, detail="Subject does not exist.")
