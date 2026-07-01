@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.routers import auth
 from app.routers import users
 from app.routers import subject
+from app.routers import admin
 
 load_dotenv()
 
@@ -21,6 +22,7 @@ def root():
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(subject.router)
+app.include_router(admin.router)
 
 @app.get("/testDB")
 def test():

@@ -22,6 +22,7 @@ from app.models.user import User
 from app.models.subject import Subject
 from app.models.otp import OTP
 from app.database import Base
+from app.models.lecture import Lecture
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
